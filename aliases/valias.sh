@@ -1,2 +1,7 @@
-vim ~/Development/bashfun/aliases/$1.sh
-chmod +x ~/Development/bashfun/aliases/$1.sh
+aliasFile=~/Development/bashfun/aliases/$1.sh
+
+echo $aliasFile
+
+touch $aliasFile
+chmod +x $aliasFile
+vim $aliasFile
