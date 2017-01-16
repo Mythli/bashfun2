@@ -20,9 +20,13 @@
 # simple logging. 
 # --------------------------------------------------------------------------------
 
+
+SCRIPT=`realpath $0`
+SCRIPTPATH=`dirname $SCRIPT`
+
 # mysql server info ------------------------------------------
-if [ -e ./mysqlbkup.config ]; then
-    . ./mysqlbkup.config
+if [ -e "$SCRIPTPATH/mysqlbkup.config" ]; then
+    . $SCRIPTPATH/mysqlbkup.config
 fi
 
 if [ -z "$DEFAULTS_FILE" ]; then
@@ -41,8 +45,8 @@ if [ -z "$MAX_BACKUPS" ]; then
 fi
 
 if [ ! -d "$BACKUP_DIR" ]; then
-    echo "Backup directory $BACKUP_DIR does not exist." 1>&2
-    exit 5
+    mkdir -p $BACKUP_DIR
+    chown "$BACKUP_USER:$BACKUP_GROUP" $BACKUP_DIR 
 fi
 
 if [ ! -e $DEFAULTS_FILE ]; then
