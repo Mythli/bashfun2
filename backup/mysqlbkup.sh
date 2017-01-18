@@ -25,8 +25,8 @@ SCRIPT=`realpath $0`
 SCRIPTPATH=`dirname $SCRIPT`
 
 # mysql server info ------------------------------------------
-if [ -e "$SCRIPTPATH/mysqlbkup.config" ]; then
-    . $SCRIPTPATH/mysqlbkup.config
+if [ -e "$SCRIPTPATH/backup.config" ]; then
+    . $SCRIPTPATH/backup.config
 fi
 
 if [ -z "$DEFAULTS_FILE" ]; then
@@ -46,7 +46,7 @@ fi
 
 if [ ! -d "$BACKUP_DIR" ]; then
     mkdir -p $BACKUP_DIR
-    chown "$BACKUP_USER:$BACKUP_GROUP" $BACKUP_DIR 
+    chown "$BACKUP_USER:$BACKUP_GROUP" $BACKUP_DIR
 fi
 
 if [ ! -e $DEFAULTS_FILE ]; then
@@ -117,7 +117,7 @@ fi
 
 echo "== Running $0 on $(hostname) - $date =="; echo
 
-# loop over the list of databases
+ loop over the list of databases
 for db in $dbs
 do
     # Check to see if the current database should be skipped
@@ -156,7 +156,7 @@ do
         # create the backup dir for $db if it doesn't exist
         echo "Creating directory $backupDir"
         mkdir -p "$backupDir"
-        chown "$BACKUP_USER:$BACKUP_GROUP" $backupDir 
+        chown "$BACKUP_USER:$BACKUP_GROUP" $backupDir
     else
         # nuke any backups beyond $MAX_BACKUPS
         nuke $backupDir "sql.$BKUP_EXT"
@@ -181,6 +181,30 @@ do
         $TAR_BIN "$backupDir/$wwwBackupFile" "$WWW_DIR/$db"
         chown "$BACKUP_USER:$BACKUP_GROUP" "$backupDir/$wwwBackupFile"
     fi
+done
+
+
+echo "YEAH $FOLDERS"
+
+for folder in $(echo $FOLDERS | sed "s/,/ /g")
+do
+    folderName=`basename $folder`
+    backupDir="$BACKUP_DIR/$folderName"
+
+    if [ ! -d "$backupDir" ]; then
+        # create the backup dir for $db if it doesn't exist
+        echo "Creating directory $backupDir"
+        mkdir -p "$backupDir"
+        chown "$BACKUP_USER:$BACKUP_GROUP" $backupDir
+    else
+        # nuke any backups beyond $MAX_BACKUPS
+
+        nuke $backupDir "$BKUP_EXT"
+    fi
+
+    folderBackupFile="$date-$folderName.$BKUP_EXT"
+
+    $TAR_BIN "$backupDir/$folderBackupFile" "$folder"
 done
 
 echo "Finished running - $date"; echo
