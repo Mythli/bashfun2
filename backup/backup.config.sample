@@ -7,7 +7,7 @@ DEFAULTS_FILE=/etc/mysqlbkup.cnf
 
 BACKUP_DIR=/var/mysqlbkup
 
-MAX_BACKUPS=3
+MAX_BACKUPS=1
 
 # Databases to ignore
 # This is a space separated list.

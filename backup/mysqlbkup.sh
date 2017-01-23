@@ -20,9 +20,13 @@
 # simple logging. 
 # --------------------------------------------------------------------------------
 
+
+SCRIPT=`realpath $0`
+SCRIPTPATH=`dirname $SCRIPT`
+
 # mysql server info ------------------------------------------
-if [ -e ./mysqlbkup.config ]; then
-    . ./mysqlbkup.config
+if [ -e "$SCRIPTPATH/backup.config" ]; then
+    . $SCRIPTPATH/backup.config
 fi
 
 if [ -z "$DEFAULTS_FILE" ]; then
@@ -41,8 +45,8 @@ if [ -z "$MAX_BACKUPS" ]; then
 fi
 
 if [ ! -d "$BACKUP_DIR" ]; then
-    echo "Backup directory $BACKUP_DIR does not exist." 1>&2
-    exit 5
+    mkdir -p $BACKUP_DIR
+    chown "$BACKUP_USER:$BACKUP_GROUP" $BACKUP_DIR
 fi
 
 if [ ! -e $DEFAULTS_FILE ]; then
@@ -60,10 +64,28 @@ if ! grep -Fxq "[mysqldump]" $DEFAULTS_FILE; then
     exit 8
 fi
 
-if ! (stat -c "%a" $DEFAULTS_FILE | grep -xq ".00"); then
-    echo "DEFAULTS_FILE ($DEFAULTS_FILE) needs secure file permissions" 1>&2
-    exit 9
-fi
+nuke() {
+    nukeDir=$1
+    nukeExtension=$2
+
+    numBackups=$(ls -1lt "$nukeDir"/*."$nukeExtension" 2>/dev/null | wc -l) # count the number of existing backups for $db
+    if [ -z "$numBackups" ]; then numBackups=0; fi
+
+    if [ "$numBackups" -gt "$MAX_BACKUPS" ]; then
+        # how many files to nuke
+        ((numFilesToNuke = "$numBackups - $MAX_BACKUPS + 1"))
+        # actual files to nuke
+        filesToNuke=$(ls -1rt "$nukeDir"/*."$nukeExtension" | head -n "$numFilesToNuke" | tr '\n' ' ')
+
+        echo "Nuking files $filesToNuke"
+        rm $filesToNuke
+    fi
+}
+
+#if ! (stat -c "%a" $DEFAULTS_FILE | grep -xq ".00"); then
+#    echo "DEFAULTS_FILE ($DEFAULTS_FILE) needs secure file permissions" 1>&2
+#    exit 9
+#fi
 
 # First command line arg indicates dry mode meaning don't actually run mysqldump
 DRY_MODE=0
@@ -95,7 +117,7 @@ fi
 
 echo "== Running $0 on $(hostname) - $date =="; echo
 
-# loop over the list of databases
+ loop over the list of databases
 for db in $dbs
 do
     # Check to see if the current database should be skipped
@@ -124,7 +146,8 @@ do
     done;
 
     backupDir="$BACKUP_DIR/$db"    # full path to the backup dir for $db
-    backupFile="$date-$db.sql.$BKUP_EXT"  # filename of backup for $db & $date
+    mysqlBackupFile="$date-$db.sql.$BKUP_EXT"  # filename of backup for $db & $date
+    wwwBackupFile="$date-$db.www.$BKUP_EXT"  # filename of backup for $db & $date
 
     echo "Backing up $db into $backupDir"
 
@@ -133,32 +156,55 @@ do
         # create the backup dir for $db if it doesn't exist
         echo "Creating directory $backupDir"
         mkdir -p "$backupDir"
+        chown "$BACKUP_USER:$BACKUP_GROUP" $backupDir
     else
         # nuke any backups beyond $MAX_BACKUPS
-        numBackups=$(ls -1lt "$backupDir"/*."$BKUP_EXT" 2>/dev/null | wc -l) # count the number of existing backups for $db
-        if [ -z "$numBackups" ]; then numBackups=0; fi
-
-        if [ "$numBackups" -gt "$MAX_BACKUPS" ]; then
-            # how many files to nuke
-            ((numFilesToNuke = "$numBackups - $MAX_BACKUPS + 1"))
-            # actual files to nuke
-            filesToNuke=$(ls -1rt "$backupDir"/*."$BKUP_EXT" | head -n "$numFilesToNuke" | tr '\n' ' ')
-
-            echo "Nuking files $filesToNuke"
-            rm $filesToNuke
-        fi
+        nuke $backupDir "sql.$BKUP_EXT"
+        nuke $backupDir "www.$BKUP_EXT"
     fi
 
     # create the backup for $db
-    echo "Running: mysqldump --defaults-file=$DEFAULTS_FILE $db | $BKUP_BIN > $backupDir/$backupFile"
+    echo "yeah"
+    echo "Running: mysqldump --defaults-file=$DEFAULTS_FILE $db | $BKUP_BIN > $backupDir/$mysqlBackupFile"
+    echo "Running: $TAR_BIN $backupDir/$wwwBackupFile $WWW_DIR/$db"
 
     # Skip actual call to mysqldump in DRY mode
     if [ $DRY_MODE -eq 1 ]; then
         continue;
     fi
 
-    mysqldump --defaults-file=$DEFAULTS_FILE "$db" | $BKUP_BIN > "$backupDir/$backupFile"
+    mysqldump --defaults-file=$DEFAULTS_FILE "$db" | $BKUP_BIN > "$backupDir/$mysqlBackupFile"
+
     echo
+
+    if [ -d "$WWW_DIR/$db" ]; then
+        $TAR_BIN "$backupDir/$wwwBackupFile" "$WWW_DIR/$db"
+        chown "$BACKUP_USER:$BACKUP_GROUP" "$backupDir/$wwwBackupFile"
+    fi
+done
+
+
+echo "YEAH $FOLDERS"
+
+for folder in $(echo $FOLDERS | sed "s/,/ /g")
+do
+    folderName=`basename $folder`
+    backupDir="$BACKUP_DIR/$folderName"
+
+    if [ ! -d "$backupDir" ]; then
+        # create the backup dir for $db if it doesn't exist
+        echo "Creating directory $backupDir"
+        mkdir -p "$backupDir"
+        chown "$BACKUP_USER:$BACKUP_GROUP" $backupDir
+    else
+        # nuke any backups beyond $MAX_BACKUPS
+
+        nuke $backupDir "$BKUP_EXT"
+    fi
+
+    folderBackupFile="$date-$folderName.$BKUP_EXT"
+
+    $TAR_BIN "$backupDir/$folderBackupFile" "$folder"
 done
 
 echo "Finished running - $date"; echo
