@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 aliasDir () {
 	folder=$1
 	prefix=$2
