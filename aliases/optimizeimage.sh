@@ -4,7 +4,7 @@
 
 # Function to check if required commands are available
 check_required_commands() {
-    local commands=("magick" "jpegoptim" "cwebp" "pngquant")
+    local commands=("magick" "jpegoptim" "cwebp" "pngquant" "pngcrush")
     for cmd in "${commands[@]}"; do
         command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "$cmd is required but it's not installed. Aborting."; exit 1; }
     done
@@ -113,7 +113,7 @@ create_images() {
         fi
     fi
     if [ "$optimize" = true ]; then
-        jpegoptim --max="$final_quality" "$output_jpg"
+        jpegoptim "$output_jpg"
     fi
     echo "JPG file created: $output_jpg"
 
@@ -128,10 +128,11 @@ create_images() {
             output_webp="$new_output_webp"
         fi
     fi
+
     if [ "$optimize" = true ]; then
-        cwebp -q "$final_quality" "$output_webp" -o "$output_webp"
+        echo "compressing!!!"
+        cwebp "$output_webp" -o "$output_webp"
     fi
-    echo "WebP file created: $output_webp"
 
     # Create and optimize PNG file preserving transparency
     local output_png="${directory}/${filename}_${initial_quality}_${dimensions}.png"
@@ -144,6 +145,14 @@ create_images() {
             output_png="$new_output_png"
         fi
     fi
+
+    if [ "$optimize" = true ]; then
+        echo "YEAH"
+        pngcrush "$output_png" "$output_png.tmp"
+        rm "$output_png"
+        cp "$output_png.tmp" "$output_png"
+    fi
+
     echo "PNG file created: $output_png"
 }
 
