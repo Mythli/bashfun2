@@ -8,4 +8,5 @@ sleep 3
         pkill -f Skype
         pkill -f Viber
         pkill -f zoom
+	pkill -f Discord
 done
